@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}History – MathML Forge{% endblock %}
+{% block extra_head %}
+<style>
+.hist-row{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:10px;overflow:hidden;transition:.15s;
+}
+.hist-row:hover{border-color:var(--border2);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.hist-main{display:flex;align-items:center;gap:14px;padding:14px 18px;flex-wrap:wrap}
+.hist-icon{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;font-family:serif}
+.hist-icon.single{background:rgba(26,107,60,.1)}
+.hist-icon.multiple{background:rgba(30,95,168,.1)}
+.hist-info{flex:1;min-width:140px}
+.hist-label{font-weight:500;font-size:.9rem;margin-bottom:3px}
+.hist-meta{font-size:.72rem;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hist-alt{
+  padding:8px 18px 12px 72px;
+  font-size:.77rem;color:var(--text2);line-height:1.55;
+  border-top:1px solid var(--border);background:var(--surface2);
+}
+.hist-alt-label{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:500;margin-bottom:4px}
+.hist-svg{max-height:40px;max-width:80px;vertical-align:middle;border:1px solid var(--border);border-radius:4px;background:#fff;padding:2px}
+.actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap}
+.empty{text-align:center;padding:70px 20px;color:var(--muted)}
+.empty .big{font-size:2.5rem;margin-bottom:12px;opacity:.4}
+.empty h3{font-family:var(--font-head);font-size:1.1rem;color:var(--text);margin-bottom:8px}
+.filter-bar{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
+.filter-chip{padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-size:.75rem;cursor:pointer;color:var(--text2);transition:.15s;font-family:var(--font-mono)}
+.filter-chip:hover{border-color:var(--border2)}
+.filter-chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+</style>
+{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px">
+  <div>
+    <a href="{{ url_for('dashboard') }}" style="color:var(--muted);text-decoration:none;font-size:.78rem">← Dashboard</a>
+    <h1 style="font-family:var(--font-head);font-size:1.8rem;font-weight:800;letter-spacing:-1px;margin-top:8px">
+      Conversion <span style="color:var(--accent3)">History</span>
+    </h1>
+    <p style="color:var(--muted);font-size:.78rem;margin-top:4px">
+      {{ conversions|length }} record{{ 's' if conversions|length != 1 }}
+    </p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="{{ url_for('convert_single') }}" class="btn btn-secondary btn-sm">+ Single</a>
+    <a href="{{ url_for('convert_multiple') }}" class="btn btn-blue btn-sm">+ Batch</a>
+  </div>
+</div>
+
+{% if not conversions %}
+<div class="empty">
+  <div class="big">◷</div>
+  <h3>No conversions yet</h3>
+  <p style="font-size:.82rem;margin-bottom:20px">Start converting MathML expressions to see your history here.</p>
+  <a href="{{ url_for('convert_single') }}" class="btn btn-primary">Convert Now</a>
+</div>
+{% else %}
+
+<div class="filter-bar">
+  <span style="font-size:.75rem;color:var(--muted)">Filter:</span>
+  <span class="filter-chip active" id="chip-all" onclick="filterBy('all')">All ({{ conversions|length }})</span>
+  <span class="filter-chip" id="chip-single" onclick="filterBy('single')">
+    Single ({{ conversions|selectattr('mode','eq','single')|list|length }})
+  </span>
+  <span class="filter-chip" id="chip-multiple" onclick="filterBy('multiple')">
+    Batch ({{ conversions|selectattr('mode','eq','multiple')|list|length }})
+  </span>
+</div>
+
+<div id="histList">
+{% for conv in conversions %}
+{% set alts = conv.alt_texts|from_json %}
+<div class="hist-row" data-mode="{{ conv.mode }}" data-id="{{ conv.id }}">
+  <div class="hist-main">
+    <div class="hist-icon {{ conv.mode }}">
+      {% if conv.mode=='single' %}∫{% else %}∑{% endif %}
+    </div>
+
+    {% if conv.svg_data %}
+    <div style="flex-shrink:0">
+      <img src="{{ url_for('preview_svg', conv_id=conv.id) }}" class="hist-svg" alt="preview"/>
+    </div>
+    {% endif %}
+
+    <div class="hist-info">
+      <div class="hist-label">{{ conv.label or 'Untitled' }}</div>
+      <div class="hist-meta">
+        <span class="tag {{'tag-single' if conv.mode=='single' else 'tag-batch'}}">{{ conv.mode }}</span>
+        <span>{{ conv.item_count }} item{{ 's' if conv.item_count!=1 }}</span>
+        <span>·</span>
+        <span>{{ conv.created_at.strftime('%b %d, %Y %H:%M') }}</span>
+        {% if not conv.zip_path or not conv.zip_path %}
+        <span style="color:var(--accent3)">· file missing</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="actions">
+      {% if conv.zip_path %}
+      <a href="{{ url_for('download', conv_id=conv.id) }}" class="btn btn-secondary btn-sm">⬇ ZIP</a>
+      {% else %}
+      <span class="btn btn-secondary btn-sm" style="opacity:.4;cursor:default">No file</span>
+      {% endif %}
+      <button class="btn btn-danger btn-sm" onclick="deleteRecord({{ conv.id }}, this)">✕</button>
+    </div>
+  </div>
+
+  {% if alts %}
+  <div class="hist-alt">
+    <div class="hist-alt-label">Alt-text{% if alts|length > 1 %} ({{ alts|length }} expressions){% endif %}</div>
+    {% for alt in alts[:3] %}
+    <div style="{% if not loop.first %}margin-top:4px;padding-top:4px;border-top:1px solid var(--border);{% endif %}">
+      {% if alts|length > 1 %}<span style="color:var(--accent2);font-size:.7rem">#{{ loop.index }} </span>{% endif %}
+      {{ alt[:150] }}{% if alt|length > 150 %}…{% endif %}
+    </div>
+    {% endfor %}
+    {% if alts|length > 3 %}
+    <div style="margin-top:4px;color:var(--muted);font-size:.72rem">+ {{ alts|length - 3 }} more…</div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+function filterBy(mode){
+  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+  document.getElementById('chip-'+mode).classList.add('active');
+  document.querySelectorAll('[data-mode]').forEach(row=>{
+    row.style.display=(mode==='all'||row.dataset.mode===mode)?'':'none';
+  });
+}
+
+async function deleteRecord(id, btn){
+  if(!confirm('Delete this conversion record and its ZIP file?')) return;
+  btn.disabled=true;
+  try{
+    const res=await fetch(`/history/delete/${id}`,{method:'POST'});
+    const data=await res.json();
+    if(data.success){
+      const row=document.querySelector(`[data-id="${id}"]`);
+      row.style.opacity='0';row.style.transform='translateX(-8px)';
+      row.style.transition='.25s';
+      setTimeout(()=>row.remove(),250);
+      notify('Record deleted','info');
+    } else {
+      notify('Delete failed: '+(data.error||'unknown'),'danger');
+      btn.disabled=false;
+    }
+  }catch(e){
+    notify('Error: '+e.message,'danger');
+    btn.disabled=false;
+  }
+}
+</script>
+{% endblock %}

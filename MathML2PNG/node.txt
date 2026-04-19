@@ -1,0 +1,1 @@
+npm install mathjax-full speech-rule-engine sharp
