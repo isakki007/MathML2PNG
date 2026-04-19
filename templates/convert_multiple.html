@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Batch Conversion – MathML Forge{% endblock %}
+{% block extra_head %}
+<style>
+.item-card{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:16px;margin-bottom:10px;position:relative;transition:.15s}
+.item-card:hover{border-color:var(--border2)}
+.item-num{font-family:var(--font-head);font-size:.85rem;font-weight:700;color:var(--accent2);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.item-remove{background:none;border:1px solid rgba(176,58,46,.2);color:var(--accent3);border-radius:5px;cursor:pointer;padding:3px 8px;font-size:.72rem;transition:.15s;font-family:var(--font-mono)}
+.item-remove:hover{background:#fdf0ee}
+.result-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:7px;margin-bottom:7px;border:1px solid var(--border);background:var(--surface2);font-size:.8rem;flex-wrap:wrap}
+.result-ok{border-color:#a7dfbf;background:#edfaf3}
+.result-err{border-color:#f0b8b2;background:#fdf0ee}
+.result-svg{max-width:120px;max-height:60px;background:#fff;border:1px solid var(--border);border-radius:4px;padding:4px}
+
+/* file upload zone */
+.upload-zone{
+  border:2px dashed var(--border);border-radius:10px;padding:28px;
+  text-align:center;cursor:pointer;transition:.2s;background:var(--surface2);
+}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent2);background:rgba(30,95,168,.04)}
+.upload-zone input{display:none}
+.tab-bar{display:flex;gap:2px;margin-bottom:0;border-bottom:1px solid var(--border)}
+.tab{padding:8px 16px;font-size:.78rem;cursor:pointer;border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;color:var(--muted);background:none;font-family:var(--font-mono);transition:.15s}
+.tab.active{background:var(--surface);border-color:var(--border);color:var(--text);font-weight:500;margin-bottom:-1px}
+.tab-content{display:none}.tab-content.active{display:block}
+.tab-body{border:1px solid var(--border);border-top:none;border-radius:0 0 9px 9px;padding:16px;background:var(--surface)}
+</style>
+{% endblock %}
+{% block content %}
+<div style="margin-bottom:28px">
+  <a href="{{ url_for('dashboard') }}" style="color:var(--muted);text-decoration:none;font-size:.78rem">← Dashboard</a>
+  <h1 style="font-family:var(--font-head);font-size:1.8rem;font-weight:800;letter-spacing:-1px;margin-top:8px">
+    Batch <span style="color:var(--accent2)">Conversion</span>
+  </h1>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+
+  <!-- Left: Input Builder -->
+  <div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Batch Label</label>
+        <input type="text" id="batchLabel" value="My Batch" placeholder="e.g. Chapter 5 Equations"/>
+      </div>
+
+      <!-- Input mode tabs -->
+      <div class="tab-bar">
+        <button class="tab active" onclick="switchInputTab('manual',this)">Manual Entry</button>
+        <button class="tab" onclick="switchInputTab('file',this)">Upload HTML/XML File</button>
+      </div>
+
+      <!-- Manual -->
+      <div class="tab-content active" id="in-manual">
+        <div class="tab-body" style="padding-top:14px">
+          <div id="itemsList"></div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="addItem()">+ Add Expression</button>
+            <button class="btn btn-secondary btn-sm" onclick="loadExamples()">Load Examples</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- File upload -->
+      <div class="tab-content" id="in-file">
+        <div class="tab-body">
+          <div class="upload-zone" id="uploadZone" onclick="document.getElementById('xmlFileInput').click()"
+               ondragover="event.preventDefault();this.classList.add('drag')"
+               ondragleave="this.classList.remove('drag')"
+               ondrop="handleDrop(event)">
+            <input type="file" id="xmlFileInput" accept=".html,.htm,.xml,.xhtml,.mml" onchange="handleFileSelect(this)"/>
+            <div style="font-size:1.8rem;margin-bottom:8px">📄</div>
+            <div style="font-size:.85rem;font-weight:500;color:var(--text2)">Drop HTML/XML file here</div>
+            <div style="font-size:.74rem;color:var(--muted);margin-top:4px">or click to browse · .html .xml .xhtml .mml</div>
+          </div>
+          <div id="fileInfo" style="display:none;margin-top:10px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:.8rem">
+            <span id="fileName" style="font-weight:500"></span>
+            <span id="mathCount" style="color:var(--accent2);margin-left:8px"></span>
+            <button onclick="clearFile()" style="float:right;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.78rem">✕ Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary w-full" id="convertBtn" onclick="doConvert()" style="justify-content:center">
+      <span class="spinner" id="spinner"></span>
+      <span id="btnTxt">Convert All</span>
+    </button>
+  </div>
+
+  <!-- Right: Results -->
+  <div class="card" id="resultsCard" style="opacity:.45;transition:.3s">
+    <div class="card-title">Results</div>
+    <div id="progressWrap" style="display:none;margin-bottom:14px">
+      <div style="font-size:.74rem;color:var(--muted);margin-bottom:5px" id="progressLabel">Processing…</div>
+      <div style="background:var(--bg2);border-radius:20px;height:5px;overflow:hidden">
+        <div id="progressFill" style="height:100%;background:var(--accent2);width:0%;transition:.4s;border-radius:20px"></div>
+      </div>
+    </div>
+    <div id="resultsList">
+      <p style="color:var(--muted);font-size:.8rem;text-align:center;padding:30px 0">Conversion results will appear here.</p>
+    </div>
+    <div id="downloadSection" style="display:none;margin-top:14px">
+      <a id="dlLink" class="btn btn-primary w-full" style="justify-content:center;text-decoration:none">⬇ Download All (ZIP)</a>
+      <p style="color:var(--muted);font-size:.72rem;text-align:center;margin-top:6px">Contains SVG, PNG & alt-text for each expression</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let itemCount=0, fileItems=[], currentInputMode='manual';
+
+const EXAMPLES=[
+  {name:'pythagorean',mathml:`<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msup><mi>a</mi><mn>2</mn></msup><mo>+</mo><msup><mi>b</mi><mn>2</mn></msup><mo>=</mo><msup><mi>c</mi><mn>2</mn></msup></mrow></math>`},
+  {name:'euler_identity',mathml:`<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msup><mi>e</mi><mrow><mi>i</mi><mi>π</mi></mrow></msup><mo>+</mo><mn>1</mn><mo>=</mo><mn>0</mn></mrow></math>`},
+  {name:'dq_expression',mathml:`<math xmlns="http://www.w3.org/1998/Math/MathML" overflow="scroll"><mi>d</mi><mi>q</mi></math>`},
+];
+
+function switchInputTab(mode, btn){
+  currentInputMode=mode;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('in-'+mode).classList.add('active');
+}
+
+function addItem(name='',mathml=''){
+  itemCount++;const n=itemCount;
+  const div=document.createElement('div');div.className='item-card';div.id=`item-${n}`;
+  div.innerHTML=`
+    <div class="item-num">
+      <span>Expression #${n}</span>
+      <button class="item-remove" onclick="removeItem(${n})">✕ Remove</button>
+    </div>
+    <div class="form-group" style="margin-bottom:8px">
+      <label>File name (no extension)</label>
+      <input type="text" id="name-${n}" value="${name||'math_'+n}" style="width:100%"/>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>MathML</label>
+      <textarea id="ml-${n}" style="min-height:90px;font-size:.74rem;width:100%">${mathml}</textarea>
+    </div>`;
+  document.getElementById('itemsList').appendChild(div);
+}
+
+function removeItem(n){document.getElementById(`item-${n}`)?.remove()}
+function loadExamples(){document.getElementById('itemsList').innerHTML='';itemCount=0;EXAMPLES.forEach(e=>addItem(e.name,e.mathml))}
+
+// File upload handling
+function handleFileSelect(input){
+  if(input.files[0]) parseFile(input.files[0]);
+}
+function handleDrop(e){
+  e.preventDefault();document.getElementById('uploadZone').classList.remove('drag');
+  const file=e.dataTransfer.files[0];if(file) parseFile(file);
+}
+function clearFile(){
+  fileItems=[];
+  document.getElementById('fileInfo').style.display='none';
+  document.getElementById('xmlFileInput').value='';
+}
+
+async function parseFile(file){
+  const fd=new FormData();fd.append('xmlfile',file);
+  try{
+    const res=await fetch('/parse-xml',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!data.success){notify('Parse error: '+data.error,'danger');return;}
+    fileItems=data.items;
+    document.getElementById('fileName').textContent=file.name;
+    document.getElementById('mathCount').textContent=`— ${data.count} <math> element${data.count!==1?'s':''} found`;
+    document.getElementById('fileInfo').style.display='block';
+    notify(`Found ${data.count} math expression${data.count!==1?'s':''} in file`,'success');
+  }catch(e){notify('Upload error: '+e.message,'danger');}
+}
+
+async function doConvert(){
+  let items=[];
+  if(currentInputMode==='manual'){
+    document.querySelectorAll('.item-card').forEach(card=>{
+      const id=card.id.split('-')[1];
+      const name=document.getElementById(`name-${id}`)?.value.trim();
+      const mathml=document.getElementById(`ml-${id}`)?.value.trim();
+      if(mathml) items.push({name:name||`math_${id}`,mathml});
+    });
+    if(!items.length){notify('Add at least one expression','danger');return;}
+  } else {
+    if(!fileItems.length){notify('Upload a file first','danger');return;}
+    items=fileItems;
+  }
+
+  const label=document.getElementById('batchLabel').value.trim()||'Batch';
+  const btn=document.getElementById('convertBtn');
+  btn.disabled=true;
+  document.getElementById('spinner').style.display='block';
+  document.getElementById('btnTxt').textContent='Converting…';
+  document.getElementById('resultsCard').style.opacity='1';
+  document.getElementById('progressWrap').style.display='block';
+  document.getElementById('progressFill').style.width='20%';
+  document.getElementById('progressLabel').textContent=`Converting ${items.length} expression${items.length!==1?'s':''}…`;
+  document.getElementById('resultsList').innerHTML='';
+  document.getElementById('downloadSection').style.display='none';
+
+  try{
+    const res=await fetch('/convert/multiple',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({items,label})
+    });
+    document.getElementById('progressFill').style.width='85%';
+    const data=await res.json();
+    document.getElementById('progressFill').style.width='100%';
+    if(!data.success){notify(data.error||'Batch failed','danger');return;}
+
+    const list=document.getElementById('resultsList');
+    (data.results||[]).forEach(r=>{
+      const row=document.createElement('div');
+      row.className='result-row '+(r.ok?'result-ok':'result-err');
+      let svgHtml='';
+      if(r.ok && r.svgData){
+        const blob=new Blob([r.svgData],{type:'image/svg+xml'});
+        const url=URL.createObjectURL(blob);
+        svgHtml=`<img src="${url}" class="result-svg" alt="SVG"/>`;
+      }
+      row.innerHTML=`
+        ${svgHtml}
+        <div style="flex:1;min-width:100px">
+          <div style="font-weight:500;margin-bottom:3px">${r.name} ${r.ok?'<span style="color:var(--accent)">✓</span>':'<span style="color:var(--accent3)">✕</span>'}</div>
+          <div style="font-size:.74rem;color:var(--muted)">${r.ok?(r.altText||'').substring(0,100):r.error||'Failed'}</div>
+        </div>`;
+      list.appendChild(row);
+    });
+
+    document.getElementById('dlLink').href=`/download/${data.conv_id}`;
+    document.getElementById('downloadSection').style.display='block';
+    const ok=(data.results||[]).filter(r=>r.ok).length;
+    notify(`Converted ${ok}/${items.length} expression${items.length!==1?'s':''}!`,'success');
+    document.getElementById('progressLabel').textContent=`Done — ${ok} succeeded, ${data.errors?.length||0} failed`;
+  }catch(e){notify('Error: '+e.message,'danger');}
+  finally{
+    btn.disabled=false;
+    document.getElementById('spinner').style.display='none';
+    document.getElementById('btnTxt').textContent='Convert All';
+    setTimeout(()=>document.getElementById('progressWrap').style.display='none',2000);
+  }
+}
+
+// Start with 2 items
+addItem();addItem();
+</script>
+{% endblock %}

@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Single Conversion – MathML Forge{% endblock %}
+{% block extra_head %}
+<style>
+.result-panel{transition:opacity .3s}
+.alt-box{
+  background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:14px;margin-bottom:14px;
+}
+.alt-label{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:500;margin-bottom:6px}
+.alt-text{font-size:.85rem;line-height:1.65;color:var(--text2)}
+.tab-bar{display:flex;gap:2px;margin-bottom:0;border-bottom:1px solid var(--border)}
+.tab{padding:8px 16px;font-size:.78rem;cursor:pointer;border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;color:var(--muted);background:none;font-family:var(--font-mono);transition:.15s}
+.tab.active{background:var(--surface);border-color:var(--border);color:var(--text);font-weight:500;margin-bottom:-1px}
+.tab-content{display:none}.tab-content.active{display:block}
+.tab-panel{background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:16px;min-height:140px;display:flex;align-items:center;justify-content:center}
+.tab-panel img,.tab-panel svg{max-width:100%;max-height:220px;height:auto;display:block;margin:auto}
+.sample-chip{
+  display:inline-block;padding:4px 12px;border-radius:20px;
+  border:1px solid var(--border);background:var(--surface);
+  font-size:.74rem;cursor:pointer;color:var(--text2);transition:.15s;font-family:var(--font-mono);
+}
+.sample-chip:hover{border-color:var(--accent);color:var(--accent);background:rgba(26,107,60,.06)}
+</style>
+{% endblock %}
+{% block content %}
+<div style="margin-bottom:28px">
+  <a href="{{ url_for('dashboard') }}" style="color:var(--muted);text-decoration:none;font-size:.78rem">← Dashboard</a>
+  <h1 style="font-family:var(--font-head);font-size:1.8rem;font-weight:800;letter-spacing:-1px;margin-top:8px">
+    Single <span style="color:var(--accent)">Conversion</span>
+  </h1>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+
+  <!-- Input -->
+  <div>
+    <div class="card">
+      <div class="card-title">Input</div>
+      <div class="form-group">
+        <label>Label (shown in history)</label>
+        <input type="text" id="label" value="My Expression" placeholder="e.g. Pythagorean theorem"/>
+      </div>
+      <div class="form-group">
+        <label>MathML</label>
+        <textarea id="mathml" placeholder='<math xmlns="http://www.w3.org/1998/Math/MathML">...</math>' style="min-height:180px;font-size:.76rem"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="loadSample('pythagorean')">Load Example</button>
+        <button class="btn btn-primary" id="convertBtn" onclick="doConvert()">
+          <span class="spinner" id="spinner"></span>
+          <span id="btnTxt">Convert</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card mt-4" style="background:var(--surface2)">
+      <div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:500">Quick Samples</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="sample-chip" onclick="loadSample('pythagorean')">Pythagorean</span>
+        <span class="sample-chip" onclick="loadSample('euler')">Euler Identity</span>
+        <span class="sample-chip" onclick="loadSample('quadratic')">Quadratic</span>
+        <span class="sample-chip" onclick="loadSample('integral')">Integral</span>
+        <span class="sample-chip" onclick="loadSample('dq')">dq (simple)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="card result-panel" id="resultPanel" style="opacity:.5">
+    <div class="card-title">Result</div>
+
+    <!-- Alt-text -->
+    <div class="alt-box">
+      <div class="alt-label">Alt-Text (Accessibility)</div>
+      <div class="alt-text" id="altText" style="color:var(--muted);font-style:italic">Run conversion to see alt-text…</div>
+    </div>
+
+    <!-- SVG / PNG tabs -->
+    <div class="tab-bar">
+      <button class="tab active" onclick="switchTab('svg',this)">SVG Preview</button>
+      <button class="tab" onclick="switchTab('png',this)">PNG Preview</button>
+    </div>
+    <div class="tab-content active" id="tab-svg">
+      <div class="tab-panel" id="svgPanel">
+        <span style="color:var(--muted);font-size:.8rem">SVG preview appears here</span>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-png">
+      <div class="tab-panel" id="pngPanel">
+        <span style="color:var(--muted);font-size:.8rem">PNG preview appears here</span>
+      </div>
+    </div>
+
+    <!-- Download -->
+    <div id="dlWrap" style="margin-top:14px;display:none">
+      <a id="dlLink" class="btn btn-primary w-full" style="justify-content:center;text-decoration:none">
+        ⬇ Download ZIP (SVG + PNG + alt-text)
+      </a>
+    </div>
+    <div id="dlPlaceholder" style="margin-top:14px;text-align:center;color:var(--muted);font-size:.75rem">
+      Download available after conversion
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const SAMPLES = {
+  pythagorean:`<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msup><mi>a</mi><mn>2</mn></msup><mo>+</mo><msup><mi>b</mi><mn>2</mn></msup><mo>=</mo><msup><mi>c</mi><mn>2</mn></msup></mrow></math>`,
+  euler:`<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msup><mi>e</mi><mrow><mi>i</mi><mi>π</mi></mrow></msup><mo>+</mo><mn>1</mn><mo>=</mo><mn>0</mn></mrow></math>`,
+  quadratic:`<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow><mi>x</mi><mo>=</mo><mfrac><mrow><mo>-</mo><mi>b</mi><mo>±</mo><msqrt><mrow><msup><mi>b</mi><mn>2</mn></msup><mo>-</mo><mn>4</mn><mi>a</mi><mi>c</mi></mrow></msqrt></mrow><mrow><mn>2</mn><mi>a</mi></mrow></mfrac></mrow></math>`,
+  integral:`<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow><msubsup><mo>∫</mo><mn>0</mn><mo>∞</mo></msubsup><msup><mi>e</mi><mrow><mo>-</mo><msup><mi>x</mi><mn>2</mn></msup></mrow></msup><mi>dx</mi><mo>=</mo><mfrac><msqrt><mi>π</mi></msqrt><mn>2</mn></mfrac></mrow></math>`,
+  dq:`<math xmlns="http://www.w3.org/1998/Math/MathML" overflow="scroll"><mi>d</mi><mi>q</mi></math>`,
+};
+
+function loadSample(key){
+  document.getElementById('mathml').value = SAMPLES[key]||'';
+  document.getElementById('label').value = {pythagorean:'Pythagorean',euler:'Euler Identity',quadratic:'Quadratic Formula',integral:'Gaussian Integral',dq:'dq Expression'}[key]||key;
+}
+
+function switchTab(name, btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+async function doConvert(){
+  const mathml=document.getElementById('mathml').value.trim();
+  const label=document.getElementById('label').value.trim()||'Untitled';
+  if(!mathml){notify('Please enter MathML first','danger');return;}
+  const btn=document.getElementById('convertBtn');
+  document.getElementById('spinner').style.display='block';
+  document.getElementById('btnTxt').textContent='Converting…';
+  btn.disabled=true;
+  document.getElementById('resultPanel').style.opacity='0.6';
+  try{
+    const fd=new FormData();fd.append('mathml',mathml);fd.append('label',label);
+    const res=await fetch('/convert/single',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!data.success){notify('Error: '+(data.error||'Conversion failed'),'danger');return;}
+
+    document.getElementById('resultPanel').style.opacity='1';
+
+    // Alt-text
+    const at=document.getElementById('altText');
+    at.textContent=data.altText||'(no alt-text generated)';
+    at.style.fontStyle='normal';at.style.color='';
+
+    // SVG preview
+    const svgPanel=document.getElementById('svgPanel');
+    if(data.svgData){
+      const blob=new Blob([data.svgData],{type:'image/svg+xml'});
+      const url=URL.createObjectURL(blob);
+      svgPanel.innerHTML=`<img src="${url}" alt="SVG preview" style="max-width:100%;max-height:220px;background:#fff;padding:8px;border-radius:6px;border:1px solid var(--border)"/>`;
+    } else {
+      svgPanel.innerHTML='<span style="color:var(--muted);font-size:.8rem">No SVG generated</span>';
+    }
+
+    // PNG preview
+    const pngPanel=document.getElementById('pngPanel');
+    if(data.pngB64){
+      pngPanel.innerHTML=`<img src="data:image/png;base64,${data.pngB64}" alt="PNG preview" style="max-width:100%;max-height:220px;background:#fff;padding:8px;border-radius:6px;border:1px solid var(--border)"/>`;
+    } else {
+      pngPanel.innerHTML='<span style="color:var(--muted);font-size:.8rem">PNG not available (sharp not installed?)</span>';
+    }
+
+    // Download
+    document.getElementById('dlLink').href=`/download/${data.conv_id}`;
+    document.getElementById('dlWrap').style.display='block';
+    document.getElementById('dlPlaceholder').style.display='none';
+    notify('Converted successfully!','success');
+  }catch(e){notify('Network error: '+e.message,'danger');}
+  finally{
+    document.getElementById('spinner').style.display='none';
+    document.getElementById('btnTxt').textContent='Convert';
+    btn.disabled=false;
+  }
+}
+</script>
+{% endblock %}

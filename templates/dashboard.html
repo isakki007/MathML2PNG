@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – MathML Forge{% endblock %}
+{% block content %}
+<div style="margin-bottom:36px">
+  <h1 style="font-family:var(--font-head);font-size:2rem;font-weight:800;letter-spacing:-1.5px;margin-bottom:6px">
+    Welcome, <span style="color:var(--accent)">{{ username }}</span>
+  </h1>
+  <p style="color:var(--muted);font-size:.82rem">{{ total }} total conversion{{ 's' if total!=1 }} in your account.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:32px">
+  <a href="{{ url_for('convert_single') }}" style="text-decoration:none">
+    <div class="card" style="cursor:pointer;transition:.2s;border-left:3px solid var(--accent)"
+         onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 20px rgba(0,0,0,.1)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <div style="font-size:1.6rem;margin-bottom:12px">∫</div>
+      <div style="font-family:var(--font-head);font-size:1rem;font-weight:700;color:var(--accent);margin-bottom:6px">Single Conversion</div>
+      <p style="color:var(--muted);font-size:.78rem;line-height:1.6">Convert one MathML expression to SVG, PNG and alt-text.</p>
+      <div style="margin-top:14px;font-size:.75rem;color:var(--accent);font-weight:500">Start →</div>
+    </div>
+  </a>
+  <a href="{{ url_for('convert_multiple') }}" style="text-decoration:none">
+    <div class="card" style="cursor:pointer;transition:.2s;border-left:3px solid var(--accent2)"
+         onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 20px rgba(0,0,0,.1)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <div style="font-size:1.6rem;margin-bottom:12px">∑</div>
+      <div style="font-family:var(--font-head);font-size:1rem;font-weight:700;color:var(--accent2);margin-bottom:6px">Batch Conversion</div>
+      <p style="color:var(--muted);font-size:.78rem;line-height:1.6">Convert multiple expressions or upload an HTML/XML file.</p>
+      <div style="margin-top:14px;font-size:.75rem;color:var(--accent2);font-weight:500">Start →</div>
+    </div>
+  </a>
+  <a href="{{ url_for('history') }}" style="text-decoration:none">
+    <div class="card" style="cursor:pointer;transition:.2s;border-left:3px solid var(--accent3)"
+         onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 20px rgba(0,0,0,.1)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <div style="font-size:1.6rem;margin-bottom:12px">◷</div>
+      <div style="font-family:var(--font-head);font-size:1rem;font-weight:700;color:var(--accent3);margin-bottom:6px">History</div>
+      <p style="color:var(--muted);font-size:.78rem;line-height:1.6">View past conversions, download ZIP files, manage records.</p>
+      <div style="margin-top:14px;font-size:.75rem;color:var(--accent3);font-weight:500">View all →</div>
+    </div>
+  </a>
+</div>
+
+{% if recent %}
+<div class="card">
+  <div class="card-title" style="margin-bottom:14px">Recent Conversions</div>
+  {% for c in recent %}
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px">
+    <div>
+      <span class="tag {{'tag-single' if c.mode=='single' else 'tag-batch'}}">{{c.mode}}</span>
+      <span style="font-size:.82rem;margin-left:8px;font-weight:500">{{c.label}}</span>
+      <span style="color:var(--muted);font-size:.75rem;margin-left:8px">{{c.created_at.strftime('%b %d, %H:%M')}}</span>
+    </div>
+    <div style="display:flex;gap:6px">
+      <a href="{{url_for('download',conv_id=c.id)}}" class="btn btn-secondary btn-sm">⬇ ZIP</a>
+    </div>
+  </div>
+  {% endfor %}
+  <div style="margin-top:12px"><a href="{{url_for('history')}}" class="btn btn-secondary btn-sm">View all history →</a></div>
+</div>
+{% endif %}
+{% endblock %}
