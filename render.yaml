@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: mathml-forge
+    runtime: python
+    region: oregon
+    plan: starter
+
+    buildCommand: pip install -r requirements.txt && npm install --production
+
+    startCommand: gunicorn app:app --workers 4 --bind 0.0.0.0:$PORT --timeout 120 --access-logfile - --error-logfile -
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mathml-forge-db
+          property: connectionString
+      - key: OUTPUTS_DIR
+        value: /tmp/mathml_outputs
+      - key: NODE_BIN
+        value: node
+      - key: PYTHON_VERSION
+        value: 3.11.0
+
+databases:
+  - name: mathml-forge-db
+    databaseName: mathmlforge
+    user: mathmlforge
+    plan: starter
