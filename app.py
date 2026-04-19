@@ -3,8 +3,10 @@ from flask import (Flask, render_template, request, redirect, url_for,
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-import os, subprocess, json, zipfile, shutil, tempfile, uuid, re, base64
+import os, subprocess, json, zipfile, shutil, tempfile, uuid, re, base64, logging
 from datetime import datetime
+
+logging.basicConfig(level=logging.INFO)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # App & Config
@@ -427,11 +429,29 @@ def health():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Startup
+# Startup — init DB tables (runs on every gunicorn worker start)
 # ─────────────────────────────────────────────────────────────────────────────
 
-with app.app_context():
-    db.create_all()
+def init_db():
+    try:
+        with app.app_context():
+            db.create_all()
+        logging.info('✓ Database tables created/verified')
+    except Exception as e:
+        logging.error(f'✗ DB init error (will retry on first request): {e}')
+
+init_db()
+
+# Lazy fallback: also try on first request in case DB wasn't ready at startup
+@app.before_request
+def ensure_db():
+    try:
+        db.session.execute(db.text('SELECT 1'))
+    except Exception:
+        try:
+            db.create_all()
+        except Exception as e:
+            logging.error(f'DB ensure error: {e}')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

@@ -7,7 +7,7 @@ services:
 
     buildCommand: pip install -r requirements.txt && npm install --production
 
-    startCommand: gunicorn app:app --workers 4 --bind 0.0.0.0:$PORT --timeout 120 --access-logfile - --error-logfile -
+    startCommand: gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT --timeout 120 --log-level info
 
     healthCheckPath: /health
 
