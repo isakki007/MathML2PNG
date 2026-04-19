@@ -2,9 +2,7 @@ services:
   - type: web
     name: mathml2png
     runtime: python
-    buildCommand: |
-      pip install -r requirements.txt
-      npm install
+    buildCommand: pip install -r requirements.txt && npm install
     startCommand: gunicorn app:app
     envVars:
       - key: DATABASE_URL
@@ -16,7 +14,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.4
       - key: NODE_VERSION
-        value: 18.17.0
+        value: 20.18.0
 
 databases:
   - name: mathml-db
