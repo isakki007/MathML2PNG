@@ -1,22 +1,32 @@
 services:
   - type: web
-    name: mathml2png
+    name: mathml-forge
     runtime: python
-    buildCommand: pip install -r requirements.txt && npm install
-    startCommand: gunicorn app:app
+    region: oregon
+    plan: starter
+
+    buildCommand: pip install -r requirements.txt && npm install --production
+
+    startCommand: gunicorn app:app --workers 4 --bind 0.0.0.0:$PORT --timeout 120 --access-logfile - --error-logfile -
+
+    healthCheckPath: /health
+
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: mathml-db
-          property: connectionString
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mathml-forge-db
+          property: connectionString
+      - key: OUTPUTS_DIR
+        value: /tmp/mathml_outputs
+      - key: NODE_BIN
+        value: node
       - key: PYTHON_VERSION
-        value: 3.11.4
-      - key: NODE_VERSION
-        value: 20.18.0
+        value: 3.11.0
 
 databases:
-  - name: mathml-db
-    databaseName: mathml
-    user: mathml_user
+  - name: mathml-forge-db
+    databaseName: mathmlforge
+    user: mathmlforge
+    plan: starter

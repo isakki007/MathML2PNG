@@ -1,8 +1,15 @@
 {
+  "name": "mathml-forge-converter",
+  "version": "1.0.0",
+  "description": "MathML → SVG + PNG (300 DPI) + Alt-Text via mathjax-full + speech-rule-engine + sharp",
+  "main": "convert.js",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "dependencies": {
     "mathjax-full": "^3.2.2",
-    "mathjax-node-sre": "^4.0.0-beta.1",
-    "sharp": "^0.34.5",
-    "speech-rule-engine": "^4.1.3"
+    "speech-rule-engine": "^4.0.7",
+    "sharp": "^0.33.4"
   }
 }
