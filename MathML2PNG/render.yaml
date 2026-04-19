@@ -2,7 +2,9 @@ services:
   - type: web
     name: mathml2png
     runtime: python
-    buildCommand: pip install -r requirements.txt && npm install
+    buildCommand: |
+      pip install -r requirements.txt
+      npm install
     startCommand: gunicorn app:app
     envVars:
       - key: DATABASE_URL
